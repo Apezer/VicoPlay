@@ -8,6 +8,18 @@
 #include "boot_animation.h"
 #include "boot_screen.h"
 #include "menu_animation.h"
+#include "dino_game.h"
+#include "dino_screen.h"
+#include "racer_game.h"
+#include "racer_screen.h"
+#include "game_2048.h"
+#include "screen_2048.h"
+
+Game2048 puzzle;
+
+RacerGame racer;
+
+DinoGame dino;
 
 BootAnimation::Timeline bootAnimation;
 MenuAnimation::Motion menuMotion;
@@ -29,12 +41,13 @@ struct ButtonState {
 
 enum Scene { MENU, PLAY, PAUSED, OVER } scene = MENU;
 
-const char* GAME_NAMES[] = {"BREAKOUT", "SNAKE", "TETRIS"};
-const char* SCORE_STORAGE_KEYS[] = {"breakout", "snake", "tetris"};
-constexpr int MENU_WIDTHS[] = {58, 40, 46};
+const char* GAME_NAMES[] = {"BREAKOUT", "SNAKE", "TETRIS", "DINO RUN", "RACER", "2048"};
+const char* SCORE_STORAGE_KEYS[] = {"breakout", "snake", "tetris", "dino", "racer", "2048"};
+constexpr int MENU_WIDTHS[] = {58, 40, 46, 58, 40, 34};
 int selectedGame = 0;
 int score = 0;
-int highScores[3] = {};
+constexpr int GAME_COUNT = sizeof(GAME_NAMES) / sizeof(GAME_NAMES[0]);
+int highScores[GAME_COUNT] = {};
 uint32_t lastGameUpdateAt = 0;
 uint32_t lastFrameAt = 0;
 uint32_t lastActivityAt = 0;
@@ -481,6 +494,15 @@ void startGame() {
     if (selectedGame == 2) {
         initTetris();
     }
+    if (selectedGame == 3) {
+        dino.begin(millis());
+    }
+    if (selectedGame == 4) {
+        racer.begin(millis());
+    }
+    if (selectedGame == 5) {
+        puzzle.begin();
+    }
 }
 
 void drawHeader() {
@@ -501,19 +523,23 @@ void drawScreen() {
         drawHeader();
     }
     if (scene == MENU) {
-        if (battery.valid()) {
-            oled.setCursor(97, 0);
-            oled.print(battery.percent());
-            oled.print('%');
-        }
         const uint32_t now = millis();
-        for (int i = 0; i < 3; i++) {
-            int y = 15 + i * 12;
+        for (int i = 0; i < GAME_COUNT; i++) {
+            int y = 15 + i * MenuAnimation::ROW_SPACING - menuMotion.scroll();
             drawText(5 + menuMotion.rowOffset(now, i), y, GAME_NAMES[i]);
         }
         // 反色绘制使经过选中框的文字自然变黑，不依赖目标索引切换颜色。
         oled.fillRoundRect(menuMotion.rowOffset(now, selectedGame), menuMotion.y(),
                            menuMotion.width(), 11, 2, SSD1306_INVERSE);
+        // 裁切滚动区域，再绘制固定标题和底部状态。
+        oled.fillRect(0, 0, 128, 13, BLACK);
+        oled.fillRect(0, 54, 128, 10, BLACK);
+        drawHeader();
+        if (battery.valid()) {
+            oled.setCursor(97, 0);
+            oled.print(battery.percent());
+            oled.print('%');
+        }
         oled.setCursor(0, 55);
         oled.print("BEST ");
         oled.print(highScores[selectedGame]);
@@ -528,6 +554,15 @@ void drawScreen() {
         }
         if (selectedGame == 2) {
             drawTetris();
+        }
+        if (selectedGame == 3) {
+            drawDinoScreen(oled, dino);
+        }
+        if (selectedGame == 4) {
+            drawRacerScreen(oled, racer);
+        }
+        if (selectedGame == 5) {
+            draw2048Screen(oled, puzzle);
         }
     } else {
         drawText(25, 17, scene == PAUSED ? "PAUSED" : won ? "YOU WIN!" : "GAME OVER");
@@ -562,7 +597,7 @@ void setup() {
     oled.display();
     battery.begin();
     preferences.begin("vico-game", false);
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < GAME_COUNT; i++) {
         highScores[i] = preferences.getInt(SCORE_STORAGE_KEYS[i], 0);
     }
     lastActivityAt = millis();
@@ -613,7 +648,7 @@ void loop() {
     if (scene == MENU) {
         if (!menuMotion.launching()) {
             int delta = encoderSteps + (buttons[1].pressed ? 1 : 0) - (buttons[5].pressed ? 1 : 0);
-            selectedGame = ((selectedGame + delta) % 3 + 3) % 3;
+            selectedGame = ((selectedGame + delta) % GAME_COUNT + GAME_COUNT) % GAME_COUNT;
             if (encoderPressed || buttons[3].pressed) {
                 menuMotion.launch(now);
             }
@@ -640,11 +675,53 @@ void loop() {
             if (selectedGame == 2) {
                 updateTetris(now);
             }
+            if (selectedGame == 3) {
+                const bool hit =
+                    dino.update(now, encoderPressed || buttons[3].pressed || buttons[5].pressed);
+                score = dino.score;
+                if (hit) {
+                    finishGame();
+                }
+            }
+            if (selectedGame == 4) {
+                int shift = (buttons[2].pressed ? 1 : 0) - (buttons[0].pressed ? 1 : 0);
+                if (encoderSteps) {
+                    shift = encoderSteps > 0 ? 1 : -1;
+                }
+                const bool hit = racer.update(now, shift);
+                score = racer.score;
+                if (hit) {
+                    finishGame();
+                }
+            }
+            if (selectedGame == 5) {
+                if (buttons[0].pressed) {
+                    puzzle.move(Game2048::LEFT);
+                } else if (buttons[2].pressed) {
+                    puzzle.move(Game2048::RIGHT);
+                } else if (buttons[5].pressed) {
+                    puzzle.move(Game2048::UP);
+                } else if (buttons[1].pressed) {
+                    puzzle.move(Game2048::DOWN);
+                }
+                score = puzzle.score;
+                if (puzzle.won) {
+                    finishGame(true);
+                } else if (!puzzle.canMove()) {
+                    finishGame();
+                }
+            }
         }
     } else if (encoderPressed || buttons[3].pressed || buttons[6].pressed) {
         if (scene == PAUSED) {
             scene = PLAY;
             lastGameUpdateAt = now;
+            if (selectedGame == 3) {
+                dino.resume(now);
+            }
+            if (selectedGame == 4) {
+                racer.resume(now);
+            }
         } else {
             startGame();
         }

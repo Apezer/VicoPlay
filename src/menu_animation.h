@@ -4,6 +4,7 @@
 #include <cmath>
 
 namespace MenuAnimation {
+constexpr int ROW_SPACING = 10;
 constexpr uint32_t FRAME_MS = 28;
 constexpr uint32_t LAUNCH_MS = 200;
 
@@ -12,7 +13,9 @@ class Motion {
   public:
     void enter(uint32_t now, int selection, int width) {
         enteredAt_ = updatedAt_ = now;
-        y_ = 13 + selection * 12;
+        y_ = 13 + selection * ROW_SPACING;
+        scroll_ = selection > 3 ? (selection - 3) * ROW_SPACING : 0;
+        scrollVelocity_ = 0;
         width_ = width;
         yVelocity_ = widthVelocity_ = 0;
         launching_ = false;
@@ -27,14 +30,20 @@ class Motion {
         }
         while (remaining) {
             const uint32_t step = remaining > 8 ? 8 : remaining;
-            spring(y_, yVelocity_, 13 + selection * 12, step * 0.001f);
+            spring(y_, yVelocity_, 13 + selection * ROW_SPACING, step * 0.001f);
+            const float targetScroll = selection > 3 ? (selection - 3) * ROW_SPACING : 0;
+            spring(scroll_, scrollVelocity_, targetScroll, step * 0.001f);
             spring(width_, widthVelocity_, width, step * 0.001f);
             remaining -= step;
         }
     }
 
     int y() const {
-        return static_cast<int>(y_ + 0.5f);
+        return static_cast<int>(y_ - scroll_ + 0.5f);
+    }
+
+    int scroll() const {
+        return static_cast<int>(scroll_ + 0.5f);
     }
 
     int width() const {
@@ -92,6 +101,7 @@ class Motion {
     }
 
     float y_ = 13, width_ = 58;
+    float scroll_ = 0, scrollVelocity_ = 0;
     float yVelocity_ = 0, widthVelocity_ = 0;
     uint32_t enteredAt_ = 0, updatedAt_ = 0, launchedAt_ = 0;
     bool launching_ = false;
