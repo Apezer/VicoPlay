@@ -2,6 +2,7 @@
 #define SSD1306_SWITCHCAPVCC 2
 #define SSD1306_DISPLAYON 3
 #define SSD1306_DISPLAYOFF 4
+#define SSD1306_INVERSE 2
 
 struct Adafruit_SSD1306 {
     template <class T> Adafruit_SSD1306(int, int, T*, int) {}

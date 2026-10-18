@@ -180,3 +180,13 @@ g++ -std=c++17 -Itest/stubs test/logic_test.cpp -o test/logic_test.exe
 - [Vico Keyboard 固件](https://github.com/Apezer/ESP32S3-Vico-Keyboard)
 - [VicoDeck 配套软件](https://github.com/Apezer/vico-deck)
 - [官方网站](https://www.vicovico.xyz/)
+
+## 菜单动效
+
+菜单使用独立的 `src/menu_animation.h`，保留 Adafruit 显示库，没有引入第三方菜单框架：
+
+- 选中框位置与宽度使用带阻尼的弹簧插值，连续旋转时立即更新目标并保留速度。
+- 进入菜单时，三个选项按 45ms 间隔依次滑入；返回菜单也播放展开动画。
+- 确认后播放约 200ms 的横向擦除，再开始游戏；过渡期间 K8 可取消。
+- 菜单目标刷新间隔为 28ms，实际帧率受 I²C 全屏传输限制；游戏仍沿用原刷新间隔。
+- 桌面测试覆盖动画中途改选、最终落位、重复确认、过渡结束与计时回绕；流畅度仍需实机确认。

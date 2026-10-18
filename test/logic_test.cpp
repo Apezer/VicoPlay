@@ -31,6 +31,31 @@ void clearInput() {
 }
 
 int main() {
+    MenuAnimation::Motion menu;
+    menu.enter(0, 0, 58);
+    assert(menu.y() == 13 && menu.width() == 58);
+    assert(menu.rowOffset(0, 0) == 18);
+    assert(menu.rowOffset(500, 2) == 0);
+    // 尚未落位时反向选择，新目标应接管同一个连续运动状态。
+    menu.update(32, 2, 46);
+    const int movingY = menu.y();
+    assert(movingY > 13 && movingY < 37);
+    menu.update(32, 0, 58);
+    assert(menu.y() == movingY);
+    for (uint32_t time = 40; time <= 1800; time += 8) {
+        menu.update(time, 1, 40);
+        assert(menu.y() >= 13 && menu.y() <= 37);
+    }
+    assert(menu.y() == 25 && menu.width() == 40);
+    menu.launch(1800);
+    menu.launch(1900); // 重复确认不重置过渡计时。
+    assert(!menu.launchReady(1999));
+    assert(menu.wipeWidth(1900) == 64);
+    assert(menu.launchReady(2000) && menu.wipeWidth(2000) == 128);
+    menu.enter(UINT32_MAX - 49, 2, 46);
+    menu.update(10, 0, 58);
+    assert(menu.y() >= 13 && menu.y() <= 37);
+    assert(!menu.launching());
     BootAnimation::Timeline timeline;
     timeline.begin(100);
     assert(!timeline.complete(100 + BootAnimation::DURATION_MS - 1, false));

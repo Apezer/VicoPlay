@@ -7,8 +7,10 @@
 #include "battery_monitor.h"
 #include "boot_animation.h"
 #include "boot_screen.h"
+#include "menu_animation.h"
 
 BootAnimation::Timeline bootAnimation;
+MenuAnimation::Motion menuMotion;
 
 // 硬件与公共运行状态
 // 按键数组按 K1～K8 排列，与原键盘固件编号保持一致。
@@ -29,6 +31,7 @@ enum Scene { MENU, PLAY, PAUSED, OVER } scene = MENU;
 
 const char* GAME_NAMES[] = {"BREAKOUT", "SNAKE", "TETRIS"};
 const char* SCORE_STORAGE_KEYS[] = {"breakout", "snake", "tetris"};
+constexpr int MENU_WIDTHS[] = {58, 40, 46};
 int selectedGame = 0;
 int score = 0;
 int highScores[3] = {};
@@ -503,19 +506,19 @@ void drawScreen() {
             oled.print(battery.percent());
             oled.print('%');
         }
+        const uint32_t now = millis();
         for (int i = 0; i < 3; i++) {
             int y = 15 + i * 12;
-            if (i == selectedGame) {
-                oled.fillRoundRect(0, y - 2, 128, 11, 2, WHITE);
-                oled.setTextColor(BLACK);
-            }
-            drawText(5, y, GAME_NAMES[i]);
-            oled.setTextColor(WHITE);
+            drawText(5 + menuMotion.rowOffset(now, i), y, GAME_NAMES[i]);
         }
+        // 反色绘制使经过选中框的文字自然变黑，不依赖目标索引切换颜色。
+        oled.fillRoundRect(menuMotion.rowOffset(now, selectedGame), menuMotion.y(),
+                           menuMotion.width(), 11, 2, SSD1306_INVERSE);
         oled.setCursor(0, 55);
         oled.print("BEST ");
         oled.print(highScores[selectedGame]);
         drawText(77, 55, "SW:PLAY");
+        oled.fillRect(0, 11, menuMotion.wipeWidth(now), 53, BLACK);
     } else if (scene == PLAY) {
         if (selectedGame == 0) {
             drawBreakout();
@@ -583,6 +586,7 @@ void loop() {
             RotaryEncoder::discard();
             lastActivityAt = now;
             lastFrameAt = now;
+            menuMotion.enter(now, selectedGame, MENU_WIDTHS[selectedGame]);
             drawScreen();
         } else if (now - lastFrameAt >= BootAnimation::FRAME_MS) {
             lastFrameAt = now;
@@ -607,13 +611,22 @@ void loop() {
         }
     }
     if (scene == MENU) {
-        int delta = encoderSteps + (buttons[1].pressed ? 1 : 0) - (buttons[5].pressed ? 1 : 0);
-        selectedGame = ((selectedGame + delta) % 3 + 3) % 3;
-        if (encoderPressed || buttons[3].pressed) {
+        if (!menuMotion.launching()) {
+            int delta = encoderSteps + (buttons[1].pressed ? 1 : 0) - (buttons[5].pressed ? 1 : 0);
+            selectedGame = ((selectedGame + delta) % 3 + 3) % 3;
+            if (encoderPressed || buttons[3].pressed) {
+                menuMotion.launch(now);
+            }
+        } else if (buttons[7].pressed) {
+            menuMotion.enter(now, selectedGame, MENU_WIDTHS[selectedGame]);
+        }
+        menuMotion.update(now, selectedGame, MENU_WIDTHS[selectedGame]);
+        if (menuMotion.launchReady(now)) {
             startGame();
         }
     } else if (buttons[7].pressed) {
         scene = MENU;
+        menuMotion.enter(now, selectedGame, MENU_WIDTHS[selectedGame]);
     } else if (scene == PLAY) {
         if (buttons[6].pressed) {
             scene = PAUSED;
@@ -640,7 +653,8 @@ void loop() {
         oled.ssd1306_command(SSD1306_DISPLAYOFF);
         sleeping = true;
     }
-    if (!sleeping && now - lastFrameAt >= 40) {
+    const uint32_t frameInterval = scene == MENU ? MenuAnimation::FRAME_MS : 40;
+    if (!sleeping && now - lastFrameAt >= frameInterval) {
         lastFrameAt = now;
         drawScreen();
     }
