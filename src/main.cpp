@@ -423,34 +423,44 @@ void updateTetris(uint32_t now) {
 }
 
 void drawTetris() {
-    oled.drawRect(49, 12, 22, 42, WHITE);
+    // 棋盘使用完整屏幕高度：20 行 × 3 像素，两侧保留状态和预览。
+    constexpr int cellSize = 3;
+    constexpr int boardX = 49;
+    constexpr int boardY = 2;
+    oled.drawRect(boardX - 1, boardY - 1, 32, 62, WHITE);
     for (int y = 0; y < 20; y++) {
         for (int x = 0; x < 10; x++) {
             if (board[y] & (1 << x)) {
-                oled.fillRect(50 + x * 2, 13 + y * 2, 2, 2, WHITE);
+                oled.fillRect(boardX + x * cellSize, boardY + y * cellSize, cellSize, cellSize,
+                              WHITE);
             }
         }
     }
     for (int y = 0; y < 4; y++) {
         for (int x = 0; x < 4; x++) {
             if (isPieceCell(currentPiece, rotation, x, y) && pieceY + y >= 0) {
-                oled.fillRect(50 + (pieceX + x) * 2, 13 + (pieceY + y) * 2, 2, 2, WHITE);
+                oled.fillRect(boardX + (pieceX + x) * cellSize, boardY + (pieceY + y) * cellSize,
+                              cellSize, cellSize, WHITE);
             }
         }
     }
-    drawText(80, 15, "NEXT");
+    drawText(88, 2, "NEXT");
     for (int y = 0; y < 4; y++) {
         for (int x = 0; x < 4; x++) {
             if (isPieceCell(nextPiece, 0, x, y)) {
-                oled.fillRect(84 + x * 3, 26 + y * 3, 2, 2, WHITE);
+                oled.fillRect(92 + x * 4, 15 + y * 4, 3, 3, WHITE);
             }
         }
     }
-    drawText(0, 19, "LINES");
-    oled.setCursor(0, 30);
+    drawText(0, 2, "SCORE");
+    oled.setCursor(0, 13);
+    oled.print(score);
+    drawText(0, 30, "LINES");
+    oled.setCursor(0, 41);
     oled.print(clearedLines);
-    drawText(0, 47, "K5:DROP");
-    drawText(80, 47, "K6:ROT");
+    drawText(0, 56, "K5:DROP");
+    drawText(86, 44, "K6:ROT");
+    drawText(86, 56, "K7:PAUS");
 }
 
 // 游戏切换与菜单绘制
@@ -483,7 +493,10 @@ void drawScreen() {
     oled.clearDisplay();
     oled.setTextSize(1);
     oled.setTextColor(WHITE);
-    drawHeader();
+    // 俄罗斯方块独立布局，顶部状态栏让出棋盘高度。
+    if (scene != PLAY || selectedGame != 2) {
+        drawHeader();
+    }
     if (scene == MENU) {
         if (battery.valid()) {
             oled.setCursor(97, 0);
