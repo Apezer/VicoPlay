@@ -35,5 +35,7 @@ struct Adafruit_SSD1306 {
 
     void fillCircle(int, int, int, int) {}
 
+    void drawBitmap(int, int, const uint8_t*, int, int, int) {}
+
     void ssd1306_command(int) {}
 };

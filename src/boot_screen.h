@@ -7,6 +7,7 @@
 namespace BootAnimation {
 // 单色版参考图：像素箭头、衬线字标、横线与微型副标题。
 inline void draw(Adafruit_SSD1306& display, uint32_t elapsed) {
+    constexpr int brandOffsetY = -9;
     display.clearDisplay();
     display.setTextColor(WHITE);
     display.setTextSize(1);
@@ -21,19 +22,19 @@ inline void draw(Adafruit_SSD1306& display, uint32_t elapsed) {
 
     if (elapsed >= RISE_START_MS) {
         display.setFont(&FreeSerif9pt7b);
-        display.setCursor(36, 34 + titleOffset(elapsed));
+        display.setCursor(36, 34 + brandOffsetY + titleOffset(elapsed));
         display.print("VicoPlay");
         display.setFont(nullptr);
 
         // 横线为固定裁切边界：只露出线以上的字形，形成从线中浮出的效果。
-        display.fillRect(36, 40, 92, 24, BLACK);
+        display.fillRect(36, 40 + brandOffsetY, 92, 24 - brandOffsetY, BLACK);
     }
     if (elapsed >= LINE_START_MS) {
         const int width = elapsed >= RISE_START_MS
                               ? 84
                               : static_cast<int>((elapsed - LINE_START_MS) * 84 /
                                                  (RISE_START_MS - LINE_START_MS));
-        display.drawFastHLine(36, 40, width, WHITE);
+        display.drawFastHLine(36, 40 + brandOffsetY, width, WHITE);
     }
 
     if (elapsed >= RISE_END_MS) {
@@ -55,7 +56,7 @@ inline void draw(Adafruit_SSD1306& display, uint32_t elapsed) {
             for (int y = 0; y < 5; ++y) {
                 for (int x = 0; x < 3; ++x) {
                     if (bits & (1 << (14 - y * 3 - x))) {
-                        display.fillRect(40 + i * 4 + x, 47 + y, 1, 1, WHITE);
+                        display.fillRect(40 + i * 4 + x, 47 + brandOffsetY + y, 1, 1, WHITE);
                     }
                 }
             }
@@ -63,15 +64,15 @@ inline void draw(Adafruit_SSD1306& display, uint32_t elapsed) {
     }
 
     if (elapsed >= DETAILS_END_MS) {
-        display.setCursor(86, 57);
-        display.print("v0.1.0");
-    }
-    if (elapsed >= WIPE_START_MS) {
-        const int rows =
-            elapsed >= DURATION_MS
-                ? 64
-                : static_cast<int>((elapsed - WIPE_START_MS) * 64 / (DURATION_MS - WIPE_START_MS));
-        display.fillRect(0, 0, 128, rows, BLACK);
+        const int y = hintY(elapsed);
+        // 箭头与文字作为一组浮动，不改变副标题的位置。
+        display.drawFastHLine(102, y + 3, 7, WHITE);
+        display.fillRect(106, y + 1, 1, 1, WHITE);
+        display.fillRect(107, y + 2, 1, 1, WHITE);
+        display.fillRect(107, y + 4, 1, 1, WHITE);
+        display.fillRect(106, y + 5, 1, 1, WHITE);
+        display.setCursor(18, y);
+        display.print("PRESS ANY KEY");
     }
     display.display();
 }

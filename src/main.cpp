@@ -577,9 +577,9 @@ void loop() {
     if (bootAnimation.active()) {
         bool skip = encoderPressed;
         for (const auto& button : buttons) {
-            skip = skip || button.held;
+            skip = skip || button.pressed;
         }
-        if (bootAnimation.complete(now, skip)) {
+        if (bootAnimation.complete(skip)) {
             // 本次按下仅用于跳过；下一循环不会将它再次当作菜单确认。
             encoderSteps = 0;
             encoderPressed = false;

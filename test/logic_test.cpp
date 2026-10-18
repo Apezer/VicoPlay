@@ -31,6 +31,15 @@ void clearInput() {
 }
 
 int main() {
+    bool hintMovedUp = false, hintMovedDown = false;
+    for (uint32_t time = 2000; time <= 5600; time += 40) {
+        const int y = BootAnimation::hintY(time);
+        assert(y >= 52 && y + 8 <= 64);
+        assert(y == BootAnimation::hintY(time + BootAnimation::HINT_PERIOD_MS));
+        hintMovedUp |= y == 52;
+        hintMovedDown |= y == 54;
+    }
+    assert(hintMovedUp && hintMovedDown);
     MenuAnimation::Motion menu;
     menu.enter(0, 0, 58);
     assert(menu.y() == 13 && menu.width() == 58);
@@ -58,16 +67,19 @@ int main() {
     assert(!menu.launching());
     BootAnimation::Timeline timeline;
     timeline.begin(100);
-    assert(!timeline.complete(100 + BootAnimation::DURATION_MS - 1, false));
-    assert(timeline.complete(100 + BootAnimation::DURATION_MS, false));
+    assert(!timeline.complete(false));
+    assert(timeline.elapsed(60100) > BootAnimation::DURATION_MS);
+    assert(!timeline.complete(false)); // 动画播放完甚至等待一分钟也不自动进菜单。
+    assert(timeline.active());
+    assert(timeline.complete(true));
     assert(!timeline.active());
-    assert(!timeline.complete(1901, true));
+    assert(!timeline.complete(true));
     timeline.begin(2000);
-    assert(timeline.complete(2001, true));
+    assert(timeline.complete(true));
     timeline.begin(UINT32_MAX - 99);
     assert(timeline.elapsed(100) == 200);
-    assert(!timeline.complete(100, false));
-    assert(timeline.complete(BootAnimation::DURATION_MS - 100, false));
+    assert(!timeline.complete(false));
+    assert(timeline.complete(true));
     assert(BootAnimation::titleOffset(0) == 21);
     assert(BootAnimation::titleOffset(BootAnimation::RISE_END_MS) == 0);
     int previousOffset = 21;
